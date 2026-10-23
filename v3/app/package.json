@@ -1,0 +1,16 @@
+{
+  "name": "gemini-account-pool-v3",
+  "version": "3.0.0",
+  "description": "Gemini 账号池 v3 — 协议层直调，无浏览器常驻，OpenAI 兼容图片接口，适配无限画布",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "author": "GeminiPool",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^31.7.7"
+  }
+}

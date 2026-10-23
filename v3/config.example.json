@@ -1,0 +1,14 @@
+{
+  "proxy": "",
+  "api_port": 17890,
+  "api_key": "sk-改成你自己的密钥",
+  "max_attempts": 3,
+  "max_per_account": 3,
+  "queue_wait": 120,
+  "image_size": "s0",
+  "save_format": "png",
+  "thinking_level": "high",
+  "check_interval": 1800,
+  "artifacts_ttl_days": 7,
+  "preferred_port": 17890
+}

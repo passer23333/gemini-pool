@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gemini 账号池 v3</title>
+<style>
+:root{
+  --bg:#f5f6f8; --card:#fff; --bd:#e5e7eb; --tx:#1f2328; --mut:#6b7280;
+  --acc:#534ab7; --ok:#0f7b5f; --err:#c0392b; --warn:#9a6700;
+  --sbg:#fafbfc;
+  --tbh:42px;            /* 顶部标签栏高度 */
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--tx);
+  font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+.app{display:flex;flex-direction:column;height:100vh}
+
+/* ---------- 顶部标签栏 ---------- */
+.topbar{flex:0 0 auto;display:flex;align-items:stretch;gap:10px;
+  background:#fff;border-bottom:1px solid var(--bd);padding:0 14px}
+.brand{display:flex;align-items:center;flex:0 0 auto;font-size:15px;font-weight:600;
+  letter-spacing:.3px;white-space:nowrap;padding-right:12px;
+  margin-right:2px;border-right:1px solid var(--bd)}
+.brand span{font-size:11px;color:var(--acc);background:#efedfb;
+  padding:1px 6px;border-radius:8px;margin-left:4px;vertical-align:2px}
+#nav{flex:1;min-width:0;display:flex;align-items:stretch;gap:2px;
+  overflow-x:auto;scrollbar-width:none}
+#nav::-webkit-scrollbar{height:0}
+.nav-item{flex:0 0 auto;white-space:nowrap;text-align:center;border:0;background:transparent;
+  padding:11px 13px;border-bottom:2px solid transparent;border-radius:0;cursor:pointer;
+  font:13px/1.5 inherit;color:var(--mut)}
+.nav-item:hover{background:var(--sbg);color:var(--tx)}
+.nav-item.active{background:transparent;color:var(--acc);
+  border-bottom-color:var(--acc);font-weight:500}
+.engine-status{flex:0 0 auto;display:flex;align-items:center;margin-left:auto;
+  font-size:12px;padding-left:12px;border-left:1px solid var(--bd);white-space:nowrap}
+.engine-status.ok{color:var(--ok)} .engine-status.err{color:var(--err)}
+
+/* ---------- 主区 ---------- */
+main{flex:1;min-height:0;overflow:auto;padding:22px 26px}
+.page{display:none}
+.page.active{display:block}
+.page-head{margin-bottom:16px}
+.page-head h2{margin:0 0 3px;font-size:17px;font-weight:600}
+.page-head p{margin:0;color:var(--mut);font-size:12.5px}
+
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;
+  padding:15px 16px;margin-bottom:14px}
+.card h3{margin:0 0 10px;font-size:13.5px;font-weight:600}
+
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.row:last-child{margin-bottom:0}
+input,textarea,select,button{font:13px/1.5 inherit;padding:7px 10px;
+  border:1px solid var(--bd);border-radius:6px;background:#fff;color:var(--tx)}
+input[type=text]{flex:1;min-width:200px}
+textarea{width:100%;min-height:64px;font-family:ui-monospace,Consolas,monospace;font-size:12px}
+button{cursor:pointer;background:var(--acc);color:#fff;border-color:var(--acc)}
+button:hover{filter:brightness(1.08)}
+button.sec{background:#fff;color:var(--tx);border-color:var(--bd)}
+button.sm{padding:4px 9px;font-size:12px}
+button.danger{background:#fff;color:var(--err);border-color:#f3c9c4}
+button[disabled]{opacity:.45;cursor:not-allowed;filter:none}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:8px 9px;border-bottom:1px solid var(--bd);vertical-align:middle}
+th{font-weight:500;color:var(--mut);font-size:12px}
+tbody tr:hover{background:var(--sbg)}
+
+.tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;
+  background:#eef0f3;color:var(--mut)}
+.tag.ok{background:#e1f5ee;color:var(--ok)}
+.tag.err{background:#fcebeb;color:var(--err)}
+.tag.warn{background:#faeeda;color:var(--warn)}
+
+.mut{color:var(--mut);font-size:12px}
+.mono{font-family:ui-monospace,Consolas,monospace;font-size:12px}
+.err{color:var(--err)} .ok{color:var(--ok)}
+.empty{color:#9ca3af;text-align:center;padding:26px;font-size:13px}
+
+/* 登录态告警条：登录态是「必须人来处理」的问题，静默失败不可接受 */
+.auth-alert{display:flex;align-items:center;gap:10px;background:#fdf6e3;border:1px solid #f0dca8;
+  border-radius:8px;padding:9px 11px;margin-bottom:10px;font-size:12.5px;color:#8a6d1f}
+.auth-alert b{color:#7a5c12}
+.auth-alert button{padding:3px 9px;font-size:12px}
+
+pre.snippet{background:var(--sbg);border:1px solid var(--bd);border-radius:7px;
+  padding:10px 12px;overflow:auto;font:12px/1.65 ui-monospace,Consolas,monospace;margin:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:11px}
+.cell{border:1px solid var(--bd);border-radius:9px;overflow:hidden;background:#fff;cursor:zoom-in}
+.cell img{display:block;width:100%;height:132px;object-fit:cover}
+.cell .meta{padding:5px 8px;font-size:11px;color:var(--mut)}
+.hidden{display:none !important}
+
+/* ---------- Gemini 工作台（内嵌网页） ---------- */
+.studio{display:flex;height:calc(100vh - 132px - var(--tbh));min-height:480px;background:#fff;
+  border:1px solid var(--bd);border-radius:10px;overflow:hidden}
+.studio-side{width:190px;flex:0 0 190px;border-right:1px solid var(--bd);
+  overflow:auto;padding:8px}
+.studio-side .cap{font-size:11.5px;color:var(--mut);padding:4px 8px 8px;line-height:1.5}
+.studio-acc{display:flex;align-items:center;gap:7px;padding:7px 9px;border-radius:7px;
+  cursor:pointer;font-size:12.5px;color:var(--mut);margin-bottom:2px}
+.studio-acc:hover{background:var(--sbg);color:var(--tx)}
+.studio-acc.active{background:#efedfb;color:var(--acc);font-weight:500}
+.studio-acc .dot{width:7px;height:7px;border-radius:50%;flex:0 0 7px;background:#c9ced6}
+.studio-acc .dot.ok{background:#12a37a} .studio-acc .dot.warn{background:#d9a222}
+.studio-acc .dot.err{background:#c0392b}
+.studio-acc .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.studio-acc .op{font-size:11px;color:var(--acc)}
+.studio-main{flex:1;display:flex;flex-direction:column;min-width:0}
+.studio-toolbar{display:flex;gap:6px;align-items:center;padding:8px 9px;
+  border-bottom:1px solid var(--bd)}
+.studio-toolbar button{padding:4px 8px}
+.studio-url{flex:1;min-width:80px;font-family:ui-monospace,Consolas,monospace;
+  font-size:11.5px;color:var(--mut);padding:4px 8px}
+.studio-stage-wrap{position:relative;flex:1;min-height:0;background:#fff}
+.studio-ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:8px;color:var(--mut);text-align:center;padding:24px}
+.studio-ph .big{font-size:15px;color:var(--tx);font-weight:600}
+.studio-ph ul{margin:6px 0 0;padding-left:18px;font-size:12px;line-height:1.8;text-align:left}
+#studioStage{position:absolute;inset:0;pointer-events:none}
+.studio-status{padding:6px 10px;font-size:11.5px;color:var(--mut);
+  border-top:1px solid var(--bd);display:flex;gap:8px;align-items:center}
+.studio-status .err{color:var(--err)}
+
+/* 放大预览：图片 + 下方操作条 */
+.viewer-box{display:flex;flex-direction:column;gap:10px;max-width:92vw;max-height:92vh}
+.viewer-box img{max-width:92vw;max-height:80vh;object-fit:contain;border-radius:8px}
+.viewer-bar{display:flex;gap:8px;align-items:center;background:#fff;padding:8px 12px;
+  border-radius:9px;font-size:11.5px;color:var(--mut)}
+.viewer-bar .mono{font-size:11px;max-width:52vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* 生图页 */
+.seg{display:inline-flex;border:1px solid var(--bd);border-radius:7px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:5px 13px;background:#fff;color:var(--mut);
+  font-size:12.5px}
+.seg button+button{border-left:1px solid var(--bd)}
+.seg button.on{background:var(--acc);color:#fff}
+.gen-out{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.gen-out img{max-width:520px;max-height:460px;border-radius:9px;border:1px solid var(--bd);
+  cursor:zoom-in;background:var(--sbg)}
+.gen-meta{flex:1;min-width:220px;font-size:12.5px}
+.ref-thumbs{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.ref-thumbs:empty{margin-top:0}
+.ref-thumb{position:relative;width:58px;height:58px;border:1px solid var(--bd);
+  border-radius:7px;overflow:hidden;background:var(--sbg)}
+.ref-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.ref-thumb i{position:absolute;right:0;top:0;background:rgba(0,0,0,.55);color:#fff;
+  font-size:12px;line-height:15px;padding:0 4px;cursor:pointer;font-style:normal}
+
+/* 弹窗 */
+.mask{position:fixed;inset:0;background:rgba(17,24,39,.55);display:flex;
+  align-items:center;justify-content:center;z-index:50}
+.modal{background:#fff;border-radius:11px;padding:18px;width:440px;max-width:92vw}
+.modal h3{margin:0 0 12px;font-size:14px}
+.modal label{display:block;font-size:12px;color:var(--mut);margin:9px 0 3px}
+.modal input{width:100%}
+.modal .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:15px}
+#preview{display:none}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">Gemini 账号池<span>v3</span></div>
+    <nav id="nav">
+      <button class="nav-item active" data-page="pool">账号池</button>
+      <button class="nav-item" data-page="gen">生图</button>
+      <button class="nav-item" data-page="studio">Gemini 工作台</button>
+      <button class="nav-item" data-page="config">配置管理</button>
+      <button class="nav-item" data-page="api">对外接口</button>
+      <button class="nav-item" data-page="apilog">接口日志</button>
+      <button class="nav-item" data-page="actionlog">行动日志</button>
+      <button class="nav-item" data-page="gallery">产物画廊</button>
+    </nav>
+    <div class="engine-status" id="engineStatus">● 检测中…</div>
+  </header>
+
+  <main>
+    <!-- ============ 账号池 ============ -->
+    <section class="page active" id="page-pool">
+      <div class="page-head">
+        <h2>账号池</h2>
+        <p>多账号轮换出图；代理留空表示跟随全局配置，填了则该账号走独立出口（隔离用）。</p>
+      </div>
+      <div class="card">
+        <div id="authAlert" class="auth-alert hidden">
+          <div style="flex:1" id="authAlertText"></div>
+          <button class="sec sm" onclick="restoreAll()">回滚上次可用</button>
+          <button class="sm" onclick="repairAll()">一键修复全部</button>
+        </div>
+        <table>
+          <thead><tr>
+            <th>邮箱</th><th>状态</th><th>登录态</th><th>健康度</th><th>成功/失败</th>
+            <th>在途</th><th>冷却</th><th>代理</th><th>最近错误</th><th>操作</th>
+          </tr></thead>
+          <tbody id="poolBody"></tbody>
+        </table>
+        <div class="row" style="margin-top:12px">
+          <button class="sec sm" onclick="refresh()">刷新</button>
+          <button class="sec sm" onclick="testAll()">全部体检</button>
+        </div>
+        <div class="mut" id="loginmsg" style="margin-top:8px;min-height:18px"></div>
+      </div>
+
+      <div class="card">
+        <h3>添加账号</h3>
+        <p class="mut" style="margin:0 0 10px">
+          推荐用「Gemini 工作台」：在界面里直接登录 Google，登录成功后 Cookie
+          自动写回账号池，全程不弹独立窗口。下面的反检测浏览器是备选
+          （例如过更严格的人机验证）。
+        </p>
+        <div class="row"><span class="mut" style="flex:0 0 92px">邮箱（可选）</span>
+          <input type="text" id="newmail" placeholder="xxx@gmail.com，仅作标识，留空会自动命名"></div>
+        <div class="row"><span class="mut" style="flex:0 0 92px">独立代理</span>
+          <input type="text" id="newproxy" placeholder="留空=跟随全局；如 http://127.0.0.1:7891"></div>
+        <div class="row" style="margin-top:10px">
+          <button class="sm" onclick="addByLogin()">用浏览器登录添加</button>
+          <span class="mut" id="addmsg" style="margin-left:6px"></span>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <button class="sec sm" onclick="document.getElementById('cookieBox').classList.toggle('hidden')">
+            手工粘贴 Cookie（高级）</button>
+        </div>
+        <div id="cookieBox" class="hidden" style="margin-top:8px">
+          <p class="mut" style="margin:0 0 6px">
+            仅在无法开窗时使用（例如远程服务器）。打开 gemini.google.com → F12 →
+            Network → 任意请求 → 复制完整 Cookie 请求头粘贴到下面。
+          </p>
+          <textarea id="newcookie" placeholder="__Secure-1PSID=...; __Secure-1PSIDTS=..."></textarea>
+          <div class="row" style="margin-top:8px">
+            <button class="sec sm" onclick="addAcc()">添加</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>浏览器窗口（外部）</h3>
+        <p class="mut" style="margin:0 0 10px">
+          <b>日常不要用它</b> —— 侧边的「Gemini 工作台」把网页直接嵌在界面里，
+          看会话、手动出图、新建账号都不再弹窗。这里只在需要 Firefox 指纹过严格
+          人机验证时才用；页面在普通浏览器里打开时也只能用它。
+        </p>
+        <p class="mut" style="margin:0 0 10px">
+          窗口与「重新登录」共用同一 profile，<b>同一账号不能同时进行</b> ——
+          一边开着另一边会被拒绝。
+        </p>
+        <div class="row">
+          <select id="brAcc"><option value="">选择账号…</option></select>
+          <button class="sm" onclick="openBrowser()">打开窗口</button>
+          <button class="sec sm" onclick="closeBrowser()">关闭窗口</button>
+          <span class="mut" id="brmsg"></span>
+        </div>
+        <p class="mut" style="margin:6px 0 0">
+          窗口使用持久化 profile（<span class="mono">profiles/account_&lt;id&gt;</span>），
+          已有会话通常免密；关闭即结束，不会常驻。
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ 生图 ============ -->
+    <section class="page" id="page-gen">
+      <div class="page-head">
+        <h2>生图</h2>
+        <p>两种模式：<b>新对话</b>每次独立出图；<b>继续对话</b>接着上一张改
+          （可以直接说「把背景换成海边」这类只描述改动的话）。</p>
+      </div>
+      <div class="card">
+        <div class="row">
+          <span class="mut" style="flex:0 0 82px">模式</span>
+          <div class="seg">
+            <button id="modeNew" class="on" onclick="setMode('new')">新对话</button>
+            <button id="modeCont" onclick="setMode('continue')">继续对话</button>
+          </div>
+          <span class="mut" id="modeHint"></span>
+        </div>
+        <div class="row hidden" id="convPick">
+          <span class="mut" style="flex:0 0 82px">接续会话</span>
+          <select id="convSel" onchange="onConvPick()" style="flex:1;min-width:220px"></select>
+          <button class="danger sm" onclick="endConv()">结束会话</button>
+          <button class="sec sm" onclick="loadConvs()">刷新</button>
+        </div>
+        <div class="row">
+          <textarea id="genPrompt" rows="3"
+            placeholder="新对话：完整描述要画什么，如「一只橘猫趴在窗台上，水彩风格」&#10;继续对话：只说改动，如「把背景换成夜晚，加一个月亮」"></textarea>
+        </div>
+        <div class="row" style="align-items:flex-start">
+          <span class="mut" style="flex:0 0 82px;padding-top:6px">参考图</span>
+          <div style="flex:1;min-width:220px">
+            <div class="row" style="margin-bottom:0">
+              <button class="sec sm" onclick="$('#genRef').click()">选择图片</button>
+              <span class="mut" id="refCount">未选择（最多 10 张）</span>
+              <button class="sec sm" onclick="clearRef()">清空</button>
+            </div>
+            <div class="ref-thumbs" id="refThumbs"></div>
+          </div>
+          <button class="sm" onclick="doGenerate()" id="genBtn">生成</button>
+        </div>
+        <input type="file" id="genRef" accept="image/*" multiple
+               onchange="onRefPick(this)" style="display:none">
+        <div class="mut" id="genMsg" style="min-height:18px"></div>
+      </div>
+      <div class="card" id="genOutCard" style="display:none">
+        <div class="gen-out">
+          <img id="genImg" alt="生成结果">
+          <div class="gen-meta">
+            <div id="genMeta" class="mut"></div>
+            <div class="row" style="margin-top:8px">
+              <button class="sm" onclick="view(currentArt)">放大</button>
+              <button class="sec sm" onclick="reveal(currentArt)">在文件夹中显示</button>
+              <button class="sec sm" onclick="useAsRef()">用这张继续改</button>
+              <button class="danger sm" onclick="endCurrentConv()">结束这个会话</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Gemini 工作台 ============ -->
+    <section class="page" id="page-studio">
+      <div class="page-head">
+        <h2>Gemini 工作台</h2>
+        <p>网页会话直接嵌在界面里 —— 手动出图、过人机验证、看会话状态都不会再另外弹窗口。</p>
+      </div>
+      <div class="studio">
+        <aside class="studio-side">
+          <div class="row" style="margin-bottom:6px">
+            <button class="sm" id="studioNew" title="开一个空会话，在里面登录 Google 后自动写回账号池">新建会话</button>
+          </div>
+          <div class="cap">点账号在右侧打开。每个账号独立会话，关掉应用也保留登录状态。</div>
+          <div id="studioAccounts"></div>
+        </aside>
+        <main class="studio-main">
+          <div class="studio-toolbar">
+            <button class="sec sm" id="studioBack" title="后退">←</button>
+            <button class="sec sm" id="studioFwd" title="前进">→</button>
+            <button class="sec sm" id="studioReload" title="刷新">⟳</button>
+            <input class="studio-url" id="studioUrl" value="about:blank" spellcheck="false">
+            <button class="sec sm" id="studioGo">前往</button>
+            <button class="sm" id="studioSync" title="把网页里的最新 Cookie 写回账号池">同步登录态</button>
+            <button class="sec sm" id="studioReinject" title="用账号池里的 Cookie 重开这个会话">重开会话</button>
+            <button class="sec sm" id="studioClose">关闭标签</button>
+          </div>
+          <div class="studio-stage-wrap">
+            <div class="studio-ph" id="studioPh">
+              <div class="big">← 选一个账号开始</div>
+              <div>打开后可以在这里直接用 Gemini 网页对话、生图，</div>
+              <div>所有内容都在这个框里，不会再弹出别的窗口。</div>
+              <ul>
+                <li>会话里续期成功后，点「同步登录态」写回账号池，后台出图跟着生效</li>
+                <li>提示去登录时，用「重开会话」把账号池里的 Cookie 重新灌进去</li>
+              </ul>
+            </div>
+            <div id="studioStage"></div>
+          </div>
+          <div class="studio-status">
+            <span id="studioState">未打开</span>
+            <span style="flex:1"></span>
+            <span id="studioMsg"></span>
+          </div>
+        </main>
+      </div>
+      <div class="card hidden" id="studioFallback" style="margin-top:14px">
+        <h3>当前不是在客户端里打开</h3>
+        <p class="mut" style="margin:0">
+          内嵌工作台依赖桌面客户端把网页叠在界面上。你现在是用浏览器直接访问的
+          <span class="mono">127.0.0.1:17890/ui</span>，所以没有这块屏。
+        </p>
+        <p class="mut" style="margin:8px 0 0">
+          两个办法：从桌面图标启动应用，或者继续用「账号池 → 浏览器窗口」开外部窗口。
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ 配置管理 ============ -->
+    <section class="page" id="page-config">
+      <div class="page-head">
+        <h2>配置管理
+          <button class="sec sm" style="float:right" id="btnRestartGw">重启网关</button></h2>
+        <p>改端口需重启应用；其余项保存后立即生效。</p>
+      </div>
+      <div class="card">
+        <div class="row"><span class="mut" style="flex:0 0 132px">代理 proxy</span>
+          <input type="text" id="cfg_proxy" placeholder="http://127.0.0.1:7890"></div>
+        <div class="row"><span class="mut" style="flex:0 0 132px">端口 api_port</span>
+          <input type="text" id="cfg_api_port">
+          <span class="mut" id="cfg_port_note" style="margin-left:8px;flex:1"></span></div>
+        <div class="row"><span class="mut" style="flex:0 0 132px">API Key</span>
+          <input type="text" id="cfg_api_key"></div>
+        <div class="row"><span class="mut" style="flex:0 0 132px">单账号在途上限</span>
+          <input type="text" id="cfg_max_per_account"></div>
+        <div class="row"><span class="mut" style="flex:0 0 132px">换号重试次数</span>
+          <input type="text" id="cfg_max_attempts"></div>
+        <div class="row"><span class="mut" style="flex:0 0 132px">排队等待(秒)</span>
+          <input type="text" id="cfg_queue_wait"></div>
+        <div class="row"><span class="mut" style="flex:0 0 132px">图片尺寸</span>
+          <input type="text" id="cfg_image_size" placeholder="s0"></div>
+        <div class="row"><span class="mut" style="flex:0 0 132px">保存格式</span>
+          <select id="cfg_save_format">
+            <option value="original">原始 JPEG（Google 原图，体积小）</option>
+            <option value="png">PNG 无损（体积约 2 倍，编辑用）</option>
+          </select></div>
+        <div class="row">
+          <button class="sm" onclick="saveConfig()">保存</button>
+          <span class="mut" id="cfgmsg"></span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>关于图片质量</h3>
+        <p class="mut" style="margin:0 0 8px">
+          Google 给的原图本身就是 <b>JPEG</b>（约 1400×768、900KB 级），
+          这已经是网页端能拿到的最高分辨率，没有更大的版本可下。
+        </p>
+        <p class="mut" style="margin:0">
+          如果你之前对比过浏览器插件下载的 2MB 图片，那是插件<b>去水印后重新编码成 PNG</b>
+          的结果 —— <b>像素完全相同，只是不压缩了</b>，所以文件更大但并不会更清晰。
+          如需这种大文件（例如拿去 PS 二次编辑、避免二次压缩损失），把上面的
+          「保存格式」改为 PNG 即可。
+        </p>
+      </div>
+      <div class="card">
+        <h3>说明</h3>
+        <p class="mut" style="margin:0">
+          生成会话的思考等级固定为「高点」。它是对话维度的档位、非生图参数，
+          故不在接口与界面提供其它选项。
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ 对外接口 ============ -->
+    <section class="page" id="page-api">
+      <div class="page-head">
+        <h2>对外接口</h2>
+        <p>OpenAI 兼容。下表始终显示<b>当前实际可用</b>的地址；端口若因冲突自动顺延，会有提示。</p>
+      </div>
+      <div class="card" id="apiDrift" style="display:none;border-left:3px solid #d97706">
+        <b style="color:#d97706">端口已顺延</b>
+        <p class="mut" id="apiDriftText" style="margin:6px 0 0"></p>
+      </div>
+      <div class="card">
+        <table>
+          <tbody>
+            <tr><td style="width:110px" class="mut">Base URL</td>
+                <td class="mono" id="apiBase"></td>
+                <td style="width:52px"><button class="sec sm" onclick="cp('apiBase')">复制</button></td></tr>
+            <tr><td class="mut">API Key</td>
+                <td class="mono" id="apiKey"></td>
+                <td><button class="sec sm" onclick="cp('apiKey')">复制</button></td></tr>
+            <tr><td class="mut">发现文件</td>
+                <td class="mono" id="apiDisc"></td>
+                <td><button class="sec sm" onclick="cp('apiDisc')">复制</button></td></tr>
+            <tr><td class="mut">文生图</td>
+                <td class="mono">POST /v1/images/generations</td><td></td></tr>
+            <tr><td class="mut">图生图</td>
+                <td class="mono">POST /v1/images/edits</td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>Gemini 原生协议（Infinite Canvas 等）</h3>
+        <p class="mut" style="margin:0 0 8px">
+          这类客户端走的是 Google 官方 Gemini 协议，不是 OpenAI 协议 —— 端口与 Key 相同，
+          但路径和鉴权头不一样：
+        </p>
+        <table>
+          <tbody>
+            <tr><td style="width:110px" class="mut">Base URL</td>
+                <td class="mono" id="apiBase2"></td>
+                <td style="width:52px"><button class="sec sm" onclick="cp('apiBase2')">复制</button></td></tr>
+            <tr><td class="mut">API Key</td>
+                <td class="mono" id="apiKey2"></td>
+                <td><button class="sec sm" onclick="cp('apiKey2')">复制</button></td></tr>
+            <tr><td class="mut">拉取模型</td>
+                <td class="mono">GET /v1beta/models</td><td></td></tr>
+            <tr><td class="mut">出图</td>
+                <td class="mono">POST /v1beta/models/{模型}:generateContent</td><td></td></tr>
+          </tbody>
+        </table>
+        <p class="mut" style="margin:10px 0 0">
+          鉴权头是 <span class="mono">x-goog-api-key</span>（<span class="mono">?key=</span> 也认）；
+          拉模型清单不带 Key 也能拿到，客户端能自动发现。
+          列出的几个名字（<span class="mono">gemini-image</span> / <span class="mono">nano-banana</span>
+          / <span class="mono">gemini-2.5-flash-image</span> …）都指向同一个网页端自动模型。
+        </p>
+      </div>
+      <div class="card">
+        <h3>curl 示例 <button class="sec sm" style="float:right" onclick="cp('curlText')">复制</button></h3>
+        <pre class="snippet" id="curlText"></pre>
+      </div>
+      <div class="card">
+        <h3>支持的参数</h3>
+        <table>
+          <thead><tr><th>字段</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">prompt</td><td>提示词，必填</td></tr>
+            <tr><td class="mono">n</td><td>一次几张，1–4，跨账号并行</td></tr>
+            <tr><td class="mono">model</td><td><span class="mono">gemini-image</span>（默认）/ <span class="mono">nano-banana-2</span>；<span class="mono">nano-banana-pro</span> 需会员</td></tr>
+            <tr><td class="mono">image</td><td>图生图：multipart 文件，或 data URL / http URL / 裸 base64</td></tr>
+            <tr><td class="mono">images</td><td>多参考图：<span class="mono">image</span> 的数组形式，<b>最多 10 张</b>（multipart 传多个 <span class="mono">image</span> 字段也行）；超过的部分会被丢弃，响应里 <span class="mono">refs_dropped</span> 会标出</td></tr>
+            <tr><td class="mono">mode</td><td><span class="mono">new</span>（默认，开新对话）/ <span class="mono">continue</span>（接着上次那张改）</td></tr>
+            <tr><td class="mono">conversation_id</td><td>要续接的会话 id；省略时接最近一次。响应里会带回来</td></tr>
+          </tbody>
+        </table>
+        <p class="mut" style="margin:10px 0 0">
+          <b>对话续接</b>：响应带 <span class="mono">conversation_id</span> / <span class="mono">turn</span>，
+          下次请求带 <span class="mono">"mode":"continue"</span> 就能接着上一张改 ——
+          prompt 只需描述改动（「把背景换成夜晚」），不用重述主体。会话绑定账号，
+          <span class="mono">GET /v1/conversations</span> 查看列表，
+          <span class="mono">DELETE /v1/conversations/{id}</span> 结束。
+          续接失败（会话过期等）会自动按新对话重出，响应里 <span class="mono">fell_back</span> 为 true。
+        </p>
+        <p class="mut" style="margin:10px 0 0">
+          视频接口（<span class="mono">/v1/videos/generations</span>）需付费会员，本网关不支持。
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ 接口日志 ============ -->
+    <section class="page" id="page-apilog">
+      <div class="page-head">
+        <h2>接口日志</h2>
+        <p>每次生成的账号、成败、耗时与错误。</p>
+      </div>
+      <div class="card">
+        <div class="row">
+          <select id="apiLimit" onchange="loadApiLog()">
+            <option value="50">最近 50 条</option>
+            <option value="200" selected>最近 200 条</option>
+            <option value="1000">最近 1000 条</option>
+          </select>
+          <button class="sec sm" onclick="loadApiLog()">刷新</button>
+          <button class="danger sm" onclick="clearLogs('api')">清空</button>
+          <span class="mut" id="apilogmsg"></span>
+        </div>
+        <table>
+          <thead><tr><th>时间</th><th>账号</th><th>结果</th><th>耗时</th><th>错误</th></tr></thead>
+          <tbody id="apilogBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 行动日志 ============ -->
+    <section class="page" id="page-actionlog">
+      <div class="page-head">
+        <h2>行动日志</h2>
+        <p>账号与配置的人为操作记录。</p>
+      </div>
+      <div class="card">
+        <div class="row">
+          <select id="actLimit" onchange="loadActLog()">
+            <option value="50">最近 50 条</option>
+          <option value="200" selected>最近 200 条</option>
+          <option value="1000">最近 1000 条</option>
+        </select>
+        <button class="sec sm" onclick="loadActLog()">刷新</button>
+          <button class="danger sm" onclick="clearLogs('action')">清空</button>
+          <span class="mut" id="actlogmsg"></span>
+        </div>
+        <table>
+          <thead><tr><th>时间</th><th>级别</th><th>动作</th><th>详情</th></tr></thead>
+          <tbody id="actlogBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 产物画廊 ============ -->
+    <section class="page" id="page-gallery">
+      <div class="page-head">
+        <h2>产物画廊</h2>
+        <p>点击图片放大查看；点「位置」直接在文件管理器中选中该文件。</p>
+      </div>
+      <div class="card">
+        <div class="row">
+          <button class="sec sm" onclick="loadGallery()">刷新</button>
+          <button class="sec sm" onclick="openArtifactDir()">打开产物文件夹</button>
+          <span class="mut" id="galmsg"></span>
+        </div>
+        <div class="grid" id="galGrid"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- 放大查看 -->
+<div class="mask hidden" id="viewer" onclick="closeViewer()">
+  <div class="viewer-box" onclick="event.stopPropagation()">
+    <img id="viewerImg" alt="预览">
+    <div class="viewer-bar">
+      <span class="mono" id="viewerName"></span>
+      <span style="flex:1"></span>
+      <button class="sm" onclick="reveal(currentArt)">在文件夹中显示</button>
+      <button class="sec sm" onclick="closeViewer()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 编辑账号 -->
+<div class="mask hidden" id="editModal">
+  <div class="modal">
+    <h3>编辑账号</h3>
+    <label>名称</label><input type="text" id="editName">
+    <label>邮箱</label><input type="text" id="editEmail">
+    <label>独立代理（留空=跟随全局）</label><input type="text" id="editProxy" placeholder="http://127.0.0.1:7891">
+    <div class="actions">
+      <button class="sec sm" onclick="document.getElementById('editModal').classList.add('hidden')">取消</button>
+      <button class="sm" onclick="saveEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const K = () => localStorage.getItem('gp_key') || 'sk-geminipool';
+const $ = s => document.querySelector(s);
+
+async function api(path, body, method){
+  const r = await fetch(path, { method: method || (body !== undefined ? 'POST' : 'GET'),
+    headers: {'Content-Type':'application/json','Authorization':'Bearer '+K()},
+    body: body !== undefined ? JSON.stringify(body) : undefined });
+  const txt = await r.text();
+  let j = {};
+  try{ j = JSON.parse(txt); }catch(e){ /* 非 JSON 响应按纯文本处理 */ }
+  if(r.status === 401) throw new Error('API Key 无效');
+  // 把后端的中文原因透出来（409 的互斥提示就是靠这里显示给用户）
+  if(r.status >= 400) throw new Error((j.error && j.error.message) || ('HTTP ' + r.status));
+  return j;
+}
+function esc(s){ return String(s==null?'':s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
+function ts(t){ return t ? new Date(t*1000).toLocaleString('zh-CN',{hour12:false}) : '-'; }
+async function cp(id){
+  try{ await navigator.clipboard.writeText(document.getElementById(id).textContent); }
+  catch(e){ /* 剪贴板不可用时忽略 */ }
+}
+
+// ---------- 导航 ----------
+let currentPage = 'pool';
+document.querySelectorAll('.nav-item').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    $('#page-' + btn.dataset.page).classList.add('active');
+    // 切走工作台时要把那层网页视图藏起来，否则它会一直盖在别的页面上
+    if(currentPage === 'studio') leaveStudio();
+    currentPage = btn.dataset.page;
+    if(currentPage === 'studio') enterStudio();
+    if(currentPage === 'gen') loadConvs();
+    if(currentPage === 'apilog') loadApiLog();
+    if(currentPage === 'actionlog') loadActLog();
+    if(currentPage === 'gallery') loadGallery();
+    if(currentPage === 'config') loadConfig();
+    if(currentPage === 'api') loadApiInfo();
+  });
+});
+
+// ---------- 引擎状态 ----------
+async function refreshEngine(){
+  const el = $('#engineStatus');
+  try{
+    const st = await (await fetch('/health')).json();
+    if(st.status === 'ok'){
+      el.textContent = '● 引擎就绪 · 账号 ' + st.accounts.length;
+      el.className = 'engine-status ok';
+    }else{
+      el.textContent = '● 引擎异常'; el.className = 'engine-status err';
+    }
+  }catch(e){
+    el.textContent = '● 引擎未启动'; el.className = 'engine-status err';
+  }
+}
+
+// ---------- 账号池 ----------
+let _openWindows = [];                 // 当前开着的浏览器窗口（账号 id）
+let _loginAccount = '';                // 正在登录的账号 id
+async function refresh(){
+  await refreshEngine();
+  const st = await (await fetch('/health')).json();
+  try{
+    const ls = await api('/v1/login/status');
+    _openWindows = ls.windows || [];
+  }catch(e){ _openWindows = []; }
+  const tb = $('#poolBody');
+  renderAuthAlert(st.accounts);
+  if(!st.accounts.length){
+    tb.innerHTML = '<tr><td colspan="10" class="empty">暂无账号，在下方添加</td></tr>';
+    return;
+  }
+  tb.innerHTML = st.accounts.map(a => {
+    const cd = a.cooldown > 0 ? a.cooldown + 's' : '-';
+    const h = a.health >= 0.8 ? 'ok' : a.health >= 0.4 ? 'warn' : 'err';
+    const needLogin = a.status === 'login_required';
+    const winOpen = _openWindows.indexOf(a.id) >= 0;
+    const logging = _loginAccount === a.id;
+    return '<tr>' +
+      '<td><b>' + esc(a.email || '(未命名)') + '</b></td>' +
+      '<td><span class="tag ' + (a.status === 'active' ? 'ok' : 'err') + '">' + esc(a.status) + '</span></td>' +
+      '<td>' + authBadge(a) + '</td>' +
+      '<td><span class="tag ' + h + '">' + a.health + '</span></td>' +
+      '<td>' + a.ok + ' / ' + a.fail + '</td>' +
+      '<td>' + ((st.inflight || {})[a.id] || 0) + '</td>' +
+      '<td class="mut">' + cd + '</td>' +
+      '<td class="mut mono">' + esc(a.proxy || '全局') + '</td>' +
+      '<td class="mut">' + esc((a.last_error || '').slice(0, 42)) + '</td>' +
+      '<td>' +
+        (authBroken(a) ? '<button class="sm" onclick="repairOne(\'' + a.id + '\')">修复</button> ' : '') +
+        '<button class="sm" onclick="studioOpen(\'' + a.id + '\')">工作台</button> ' +
+        // 登录中禁用「重新登录」；窗口开着时同一 profile 被占用，按钮换成「关闭窗口」
+        '<button class="' + (needLogin ? '' : 'sec') + ' sm" ' + (logging ? 'disabled ' : '') +
+          'onclick="relogin(\'' + a.id + '\')">' + (logging ? '登录中…' : '重新登录') + '</button> ' +
+        (winOpen
+          ? '<button class="danger sm" onclick="closeBrowserById(\'' + a.id + '\')">关闭窗口</button> '
+          : '<button class="sec sm" onclick="openBrowserById(\'' + a.id + '\')">浏览器</button> ') +
+        '<button class="sec sm" onclick="editAcc(\'' + a.id + '\')">编辑</button> ' +
+        '<button class="sec sm" onclick="toggleAcc(\'' + a.id + '\',\'' + a.status + '\')">' +
+          (a.status === 'active' ? '禁用' : '启用') + '</button> ' +
+        '<button class="danger sm" onclick="delOne(\'' + a.id + '\')">删除</button>' +
+      '</td></tr>';
+  }).join('');
+  syncAccountSelect(st.accounts);
+}
+
+// ---------- 登录态 ----------
+// 后端每行都带 auth 摘要（state/level/usable/message/detail），界面只负责翻译成人话。
+// 凭据明文不会下发给界面，detail 里只有前 8 位指纹，够排查、不足以登录。
+const AUTH_TXT = {ok: ['正常', 'ok'], stale: ['待刷新', 'warn'], partial: ['缺 PSIDTS', 'warn'],
+                  revoked: ['已失效', 'err'], malformed: ['凭据损坏', 'err'],
+                  missing: ['未登录', 'err']};
+function authOf(a){ return (a && a.auth) || {}; }
+function authBroken(a){ const d = authOf(a); return d.state && d.state !== 'ok'; }
+function authUsable(a){ const d = authOf(a); return d.usable !== false; }
+function authBadge(a){
+  const d = authOf(a);
+  const t = AUTH_TXT[d.state] || ['未知', 'warn'];
+  const tip = ((d.message || '') + (d.detail ? '\n' + d.detail : ''))
+    .replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  return '<span class="tag ' + t[1] + '" title="' + tip + '">' + t[0] + '</span>';
+}
+function renderAuthAlert(accs){
+  const bad = (accs || []).filter(a => a.status === 'active' && !authUsable(a));
+  const el = $('#authAlert');
+  if(!bad.length){ el.classList.add('hidden'); return; }
+  const names = bad.slice(0, 3).map(a => a.email || a.id).join('、');
+  $('#authAlertText').innerHTML = '<b>' + bad.length + ' 个账号登录态不可用</b>（'
+    + esc(names) + (bad.length > 3 ? ' 等' : '')
+    + '）：生图会直接跳过它们，不会白等也不会重试成功。'
+    + '先试「一键修复全部」（清洗脏凭据 / 从备份回滚），不行再去「Gemini 工作台」登录一次。';
+  el.classList.remove('hidden');
+}
+async function repairOne(id){
+  toast('正在修复…', false, 'loginmsg');
+  try{
+    const r = await api('/v1/accounts/auth/repair', {id});
+    toast(r.ok ? ('已修复：' + (r.message || r.action)) : ('修不好：' + (r.message || r.error)),
+          !r.ok, 'loginmsg');
+  }catch(e){ toast(e.message, true, 'loginmsg'); }
+  refresh();
+}
+async function restoreOne(id){
+  try{
+    const r = await api('/v1/accounts/auth/restore', {id});
+    toast(r.ok ? ('已回滚到 ' + r.restored_from) : ('回滚失败：' + (r.error || '')),
+          !r.ok, 'loginmsg');
+  }catch(e){ toast(e.message, true, 'loginmsg'); }
+  refresh();
+}
+// 回滚与修复的分工：修复会先试着清洗/补回，回滚则直接换上历史那份凭据。
+// 两个都留着是因为它们的失败场景不同 —— 备份里那份可能比清洗后的更好用。
+async function restoreAll(){
+  const accs = (await (await fetch('/health')).json()).accounts
+    .filter(a => a.status === 'active' && !authUsable(a));
+  if(!accs.length){ toast('没有需要回滚的账号', false, 'loginmsg'); return; }
+  let done = 0, rest = [];
+  for(const a of accs){
+    const r = await api('/v1/accounts/auth/restore', {id: a.id});
+    if(r.ok) done++; else rest.push(a.email || a.id);
+  }
+  toast(done ? ('已回滚 ' + done + ' 个' + (rest.length ? '；没有可用备份：' + rest.join('、') : ''))
+             : ('所有账号都没有可用备份，请到「Gemini 工作台」重新登录'),
+        rest.length > 0 && done === 0, 'loginmsg');
+  refresh();
+}
+async function repairAll(){
+  const accs = (await (await fetch('/health')).json()).accounts
+    .filter(a => a.status === 'active' && !authUsable(a));
+  if(!accs.length){ toast('没有需要修复的账号', false, 'loginmsg'); return; }
+  let done = 0, rest = [];
+  for(const a of accs){
+    const r = await api('/v1/accounts/auth/repair', {id: a.id});
+    if(r.ok && r.action !== 'relogin') done++;
+    else rest.push(a.email || a.id);
+  }
+  toast(done ? ('已修复 ' + done + ' 个' + (rest.length ? '；仍需手动登录：' + rest.join('、') : ''))
+             : ('自动修复无效，请到「Gemini 工作台」重新登录：' + rest.join('、')),
+        rest.length > 0 && done === 0, 'loginmsg');
+  refresh();
+}
+
+let _accountsCache = [];
+function syncAccountSelect(accs){
+  _accountsCache = accs || _accountsCache;
+  const sel = $('#brAcc');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">选择账号…</option>' +
+    _accountsCache.map(a => '<option value="' + a.id + '">' +
+      esc(a.email || a.id) + '</option>').join('');
+  if(prev) sel.value = prev;
+}
+
+async function testOne(id){
+  const r = await api('/v1/accounts/test', {id});
+  toast(r.ok ? ('体检通过 ' + r.elapsed + 's') : ('体检失败：' + r.error), !r.ok, 'loginmsg');
+  refresh();
+}
+async function testAll(){
+  toast('逐个体检中…', false, 'loginmsg');
+  for(const a of (await (await fetch('/health')).json()).accounts){ await testOne(a.id); }
+}
+async function resetOne(id){
+  await api('/v1/accounts/update', {id, reset_stats:true});
+  refresh();
+}
+async function delOne(id){
+  if(confirm('确认删除该账号？')){ await api('/v1/accounts/delete', {id}); refresh(); }
+}
+// 主流方式：开窗登录，cookie 自动写回
+async function addByLogin(){
+  const box = $('#addmsg');
+  box.className = 'ok';
+  box.textContent = '正在打开浏览器…';
+  try{
+    await api('/v1/login/new', {
+      email: $('#newmail').value.trim(),
+      proxy: $('#newproxy').value.trim()
+    });
+    box.textContent = '已打开浏览器，请在窗口里登录 Google；登录成功后会自动写入账号池';
+    if(loginTimer) clearInterval(loginTimer);
+    loginTimer = setInterval(pollLogin, 2000);
+    pollLogin();
+  }catch(e){
+    box.className = 'err';
+    box.textContent = '启动失败：' + e.message;
+  }
+}
+
+// 备用方式：手工粘贴 Cookie（远程服务器等无法开窗的场景）
+async function addAcc(){
+  const cookie = $('#newcookie').value.trim();
+  if(!cookie){
+    $('#addmsg').className = 'err';
+    $('#addmsg').textContent = '请粘贴 Cookie';
+    return;
+  }
+  try{
+    await api('/v1/accounts/add', {
+      email: $('#newmail').value.trim(),
+      cookie,
+      proxy: $('#newproxy').value.trim()
+    });
+    $('#addmsg').className = 'ok';
+    $('#addmsg').textContent = '已添加';
+    $('#newcookie').value = ''; $('#newmail').value = ''; $('#newproxy').value = '';
+    refresh();
+  }catch(e){
+    $('#addmsg').className = 'err';
+    $('#addmsg').textContent = e.message;
+  }
+}
+
+async function editAcc(id){
+  const a = (_accountsCache || []).find(x => x.id === id);
+  if(!a) return;
+  $('#editName').value = a.email || '';
+  $('#editEmail').value = a.email || '';
+  $('#editProxy').value = a.proxy || '';
+  $('#editModal').dataset.id = id;
+  $('#editModal').classList.remove('hidden');
+}
+async function saveEdit(){
+  const id = $('#editModal').dataset.id;
+  const email = $('#editEmail').value.trim();
+  const proxy = $('#editProxy').value.trim();
+  await api('/v1/accounts/update', {id, email, proxy});
+  $('#editModal').classList.add('hidden');
+  refresh();
+}
+async function toggleAcc(id, st){
+  await api('/v1/accounts/update', {id, status: st === 'active' ? 'disabled' : 'active'});
+  refresh();
+}
+
+// ---------- Camoufox 重登 / 开窗 ----------
+let loginTimer = null;
+async function startLoginPolling(){
+  if(loginTimer) clearInterval(loginTimer);
+  loginTimer = setInterval(pollLogin, 2000);
+  pollLogin();
+}
+async function relogin(id){
+  try{
+    await api('/v1/login/start', {id});
+    _loginAccount = id;
+    toast('已打开登录窗口，请在弹出的浏览器里完成 Google 登录', false, 'loginmsg');
+    startLoginPolling();
+  }catch(e){
+    // 后端对「该账号浏览器窗口还开着」等冲突会返回明确原因，直接显示
+    toast('无法启动：' + e.message, true, 'loginmsg');
+    refresh();
+  }
+}
+async function pollLogin(){
+  let r;
+  try{ r = await api('/v1/login/status'); }catch(e){ return; }
+  const s = r.status || {};
+  _loginAccount = s.running ? (s.account || _loginAccount) : '';
+  _openWindows = r.windows || _openWindows;
+  const map = {opening:'启动中', waiting:'等待登录', verifying:'验证 cookie',
+               success:'完成', error:'失败', cancelled:'已取消', idle:''};
+  const box = $('#loginmsg');
+  box.className = (s.state === 'error' || s.state === 'cancelled') ? 'err' : 'ok';
+  box.textContent = s.state && s.state !== 'idle'
+    ? '[' + (map[s.state] || s.state) + '] ' + (s.message || '')
+      + (s.elapsed ? ' (' + s.elapsed + 's)' : '') : '';
+  if(!s.running){
+    if(loginTimer){ clearInterval(loginTimer); loginTimer = null; }
+    if(s.state === 'success'){
+      toast('登录成功，cookie 已写入并启用该账号', false, 'loginmsg');
+      $('#addmsg').textContent = '';
+      $('#newmail').value = ''; $('#newproxy').value = '';
+      refresh();
+    }
+    if(s.state === 'error' || s.state === 'cancelled'){
+      toast(s.state === 'cancelled' ? '已取消：窗口被关闭' : ('失败：' + (s.message || '')),
+            true, 'loginmsg');
+      $('#addmsg').textContent = '';
+      refresh();
+    }
+  }
+}
+
+async function openBrowserById(id){
+  try{
+    const r = await api('/v1/browser/open', {id});
+    toast(r.ok ? '窗口已打开' : ('失败：' + (r.error || '')), !r.ok, 'brmsg');
+  }catch(e){
+    toast(e.message, true, 'brmsg');   // 与登录冲突时后端会给出明确原因
+  }
+  setTimeout(refresh, 1000);
+}
+async function openBrowser(){
+  const id = $('#brAcc').value;
+  if(!id){ toast('请先选择账号', true, 'brmsg'); return; }
+  toast('正在启动浏览器窗口…', false, 'brmsg');
+  await openBrowserById(id);
+}
+async function closeBrowserById(id){
+  try{
+    const r = await api('/v1/browser/close', {id});
+    toast(r.ok ? '已关闭窗口' : '该账号没有打开的窗口', !r.ok, 'brmsg');
+  }catch(e){ toast(e.message, true, 'brmsg'); }
+  setTimeout(refresh, 1200);          // 关窗是异步的，稍等再刷新按钮状态
+}
+async function closeBrowser(){
+  const id = $('#brAcc').value;
+  if(!id){ toast('请先选择账号', true, 'brmsg'); return; }
+  await closeBrowserById(id);
+}
+
+// ---------- 配置 ----------
+async function loadConfig(){
+  const r = await api('/v1/config');
+  const c = r.config || {};
+  for(const k of ['proxy','api_port','api_key','max_attempts',
+                  'max_per_account','queue_wait','image_size','save_format',
+                  'artifacts_ttl_days','check_interval']){
+    const el = document.getElementById('cfg_' + k);
+    if(el) el.value = c[k] != null ? c[k] : '';
+  }
+  // 端口可能被自动顺延过，光看输入框会以为还是配置里那个
+  const rt = r.runtime || {};
+  const note = document.getElementById('cfg_port_note');
+  if(note) note.textContent = rt.drifted
+    ? `实际 ${rt.port}（${rt.preferred_port} 被占用，已自动顺延并写回配置）`
+    : (rt.port ? `当前 ${rt.port}` : '');
+}
+async function saveConfig(){
+  const keys = ['proxy','api_port','api_key','max_attempts',
+                'max_per_account','queue_wait','image_size','save_format',
+                'artifacts_ttl_days','check_interval'];
+  const body = {};
+  for(const k of keys){
+    const el = document.getElementById('cfg_' + k);
+    if(!el) continue;
+    const v = String(el.value).trim();
+    if(!v) continue;
+    body[k] = /^\d+$/.test(v) ? parseInt(v) : v;
+  }
+  const r = await api('/v1/config', body);
+  $('#cfgmsg').className = 'ok';
+  $('#cfgmsg').textContent =
+    '已保存' + (r.restart_required ? '（端口改动需重启应用）' : '，已生效');
+  loadConfig();
+}
+
+// ---------- 接口日志 ----------
+async function loadApiLog(){
+  const lim = $('#apiLimit').value;
+  const r = await api('/v1/logs?type=api&limit=' + lim);
+  const items = r.items || [];
+  $('#apilogmsg').textContent = '共 ' + items.length + ' 条';
+  $('#apilogBody').innerHTML = items.length ? items.map(x =>
+    '<tr><td class="mut">' + ts(x.ts) + '</td>' +
+    '<td>' + esc(x.account || '-') + '</td>' +
+    '<td>' + (x.ok ? '<span class="tag ok">成功</span>'
+                   : '<span class="tag err">失败</span>') + '</td>' +
+    '<td>' + (x.elapsed != null ? x.elapsed.toFixed(1) + 's' : '-') + '</td>' +
+    '<td class="mut">' + esc((x.err || '').slice(0, 60)) + '</td></tr>'
+  ).join('') : '<tr><td colspan="5" class="empty">暂无记录</td></tr>';
+}
+
+// ---------- 行动日志 ----------
+async function loadActLog(){
+  const lim = $('#actLimit').value;
+  const r = await api('/v1/logs?type=action&limit=' + lim);
+  const items = r.items || [];
+  $('#actlogmsg').textContent = '共 ' + items.length + ' 条';
+  $('#actlogBody').innerHTML = items.length ? items.map(x =>
+    '<tr><td class="mut">' + ts(x.ts) + '</td>' +
+    '<td><span class="tag ' + (x.level === 'error' ? 'err' : '') + '">' +
+      esc(x.level || 'info') + '</span></td>' +
+    '<td>' + esc(x.action) + '</td>' +
+    '<td class="mut">' + esc((x.detail || '').slice(0, 70)) + '</td></tr>'
+  ).join('') : '<tr><td colspan="4" class="empty">暂无记录</td></tr>';
+}
+
+async function clearLogs(which){
+  if(!confirm('确认清空' + (which === 'api' ? '接口日志' : '行动日志') + '？')) return;
+  await api('/v1/logs/clear', {which});
+  if(which === 'api') loadApiLog(); else loadActLog();
+}
+
+// ---------- 对外接口页 ----------
+async function loadApiInfo(){
+  const r = await api('/v1/config');
+  const c = r.config || {};
+  const rt = r.runtime || {};
+  const base = location.origin;
+  $('#apiBase').textContent = base;
+  $('#apiKey').textContent = c.api_key || K();
+  $('#apiBase2').textContent = base;
+  $('#apiKey2').textContent = c.api_key || K();
+  // 外部客户端不用猜端口：读这个固定路径的文件就能拿到当前真实地址
+  $('#apiDisc').textContent = rt.discovery_file || '';
+
+  // 端口顺延时明确告知，否则客户端照旧地址填会一直连不上
+  if(rt.drifted){
+    $('#apiDrift').style.display = '';
+    $('#apiDriftText').textContent =
+      `你配的 ${rt.preferred_port} 被别的程序占用，网关已自动改用 ${rt.port}。`
+      + `外部客户端请填 http://127.0.0.1:${rt.port}；腾出 ${rt.preferred_port} 后，`
+      + `可在「配置管理」把端口改回去。`;
+  } else {
+    $('#apiDrift').style.display = 'none';
+  }
+
+  const key = c.api_key || K();
+  $('#curlText').textContent =
+`# OpenAI 协议
+curl ${base}/v1/images/generations \\
+  -H "Authorization: Bearer ${key}" -H "Content-Type: application/json" \\
+  -d '{"prompt":"雪山日落，广角风光摄影","n":1}'
+
+# 接着上一次的图改（响应里拿 conversation_id，只描述改动即可）
+curl ${base}/v1/images/generations \\
+  -H "Authorization: Bearer ${key}" -H "Content-Type: application/json" \\
+  -d '{"prompt":"把太阳换成月亮，色调改成冷色","mode":"continue"}'
+
+# 多参考图（images 数组，最多 10 张；multipart 传多个 image 字段也可以）
+curl ${base}/v1/images/generations \\
+  -H "Authorization: Bearer ${key}" -H "Content-Type: application/json" \\
+  -d "{\\"prompt\\":\\"把这几种风格融合\\",\\"images\\":[\\"data:image/png;base64,\\"$(base64 -w0 a.png)],\\"data:image/png;base64,\\"$(base64 -w0 b.png)\\"]}"
+
+curl ${base}/v1/images/edits \\
+  -H "Authorization: Bearer ${key}" \\
+  -F prompt="融合这两张的构图与配色" -F image=@a.png -F image=@b.png
+
+# 会话管理
+curl ${base}/v1/conversations -H "Authorization: Bearer ${key}"
+curl -X DELETE ${base}/v1/conversations/{会话id} -H "Authorization: Bearer ${key}"
+
+# Gemini 原生协议（Infinite Canvas 这类客户端走这条）
+curl ${base}/v1beta/models -H "x-goog-api-key: ${key}"
+curl -X POST ${base}/v1beta/models/gemini-image:generateContent \\
+  -H "x-goog-api-key: ${key}" -H "Content-Type: application/json" \\
+  -d '{"contents":[{"role":"user","parts":[{"text":"雪山日落，广角风光摄影"}]}]}'`;
+}
+
+// ---------- 产物画廊 ----------
+let currentArt = '';
+async function loadGallery(){
+  const r = await api('/v1/artifacts');
+  const items = r.artifacts || [];
+  $('#galmsg').textContent = '共 ' + items.length + ' 个' + (r.dir ? ' · ' + r.dir : '');
+  const g = $('#galGrid');
+  if(!items.length){ g.innerHTML = '<div class="empty">还没有产物</div>'; return; }
+  g.innerHTML = items.map(a =>
+    '<div class="cell" onclick="view(\'' + a.name + '\')">' +
+      '<img src="/artifacts/' + a.name + '" alt="' + esc(a.name) + '" loading="lazy">' +
+      '<div class="meta" style="display:flex;align-items:center;gap:6px">' +
+        '<span style="flex:1">' + (a.size/1024).toFixed(0) + 'KB · ' + tsShort(a.mtime) + '</span>' +
+        '<button class="sec sm" style="padding:1px 6px;font-size:11px" ' +
+          'onclick="event.stopPropagation();reveal(\'' + a.name + '\')">位置</button>' +
+      '</div>' +
+    '</div>'
+  ).join('');
+}
+function tsShort(t){
+  if(!t) return '';
+  const d = new Date(t*1000);
+  const p = n => String(n).padStart(2,'0');
+  return p(d.getMonth()+1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function view(name){
+  currentArt = name;
+  $('#viewerImg').src = '/artifacts/' + name;
+  $('#viewerName').textContent = name;
+  $('#viewer').classList.remove('hidden');
+}
+function closeViewer(){
+  $('#viewer').classList.add('hidden');
+  $('#viewerImg').src = '';
+}
+async function reveal(name){
+  if(!name) return;
+  try{
+    const r = await api('/v1/artifacts/reveal', {name});
+    if(!r.ok) toast('打开文件管理器失败', true, 'galmsg');
+  }catch(e){ toast(e.message, true, 'galmsg'); }
+}
+async function openArtifactDir(){
+  try{
+    const r = await api('/v1/artifacts/open-dir', {});
+    if(!r.ok) toast('打开目录失败', true, 'galmsg');
+  }catch(e){ toast(e.message, true, 'galmsg'); }
+}
+
+function toast(t, bad, id){
+  const m = document.getElementById(id || 'msg');
+  if(!m) return;
+  m.className = bad ? 'err' : 'ok';
+  m.textContent = t;
+}
+
+// ---------- 生图 ----------
+let _genMode = 'new';
+let _convList = [];
+let _curConv = '';          // 最近一次结果所属会话，用于「结束这个会话」
+
+function setMode(m){
+  _genMode = m;
+  $('#modeNew').classList.toggle('on', m === 'new');
+  $('#modeCont').classList.toggle('on', m === 'continue');
+  $('#convPick').classList.toggle('hidden', m !== 'continue');
+  renderModeHint();
+  if(m === 'continue') loadConvs();
+}
+function renderModeHint(){
+  const hint = $('#modeHint');
+  if(_genMode === 'new'){
+    hint.textContent = '每次都另起一个对话，前后两张图互不相关';
+    return;
+  }
+  hint.textContent = _convList.length
+    ? '共 ' + _convList.length + ' 个会话；默认接续最近一次'
+    : '暂无可续接的会话，此时点生成会按新对话出图';
+}
+async function loadConvs(){
+  try{
+    const j = await api('/v1/conversations');
+    _convList = j.conversations || [];
+    const sel = $('#convSel');
+    sel.innerHTML = _convList.length
+      ? _convList.map(c => '<option value="' + esc(c.c) + '">' +
+          esc((c.email || c.account || '未知') + ' · 第 ' + c.turn + ' 轮 · ' +
+              (c.last_prompt || '').slice(0, 26)) + '</option>').join('')
+      : '<option value="">（暂无会话）</option>';
+    renderModeHint();
+  }catch(e){ toast('加载会话失败：' + e.message, true, 'genMsg'); }
+}
+function pickedCid(){
+  const v = ($('#convSel') || {}).value || '';
+  return v && _convList.some(c => c.c === v) ? v : '';
+}
+async function endConv(){
+  const cid = pickedCid();
+  if(!cid){ toast('没有可结束的会话', true, 'genMsg'); return; }
+  try{
+    await api('/v1/conversations/' + encodeURIComponent(cid), null, 'DELETE');
+    toast('已结束该会话', false, 'genMsg');
+    loadConvs();
+  }catch(e){ toast(e.message, true, 'genMsg'); }
+}
+async function endCurrentConv(){
+  if(!_curConv){ toast('当前结果没有会话信息', true, 'genMsg'); return; }
+  try{
+    await api('/v1/conversations/' + encodeURIComponent(_curConv), null, 'DELETE');
+    toast('已结束该会话，下次「继续对话」会另起一个', false, 'genMsg');
+    _curConv = '';
+    loadConvs();
+  }catch(e){ toast(e.message, true, 'genMsg'); }
+}
+/* 参考图：最多 10 张（网页端上限）。选完以缩略图展示，可单独删。
+   用数组自己存而不是读 input.files —— 多选会覆盖上次的选择，
+   用户想「先选 3 张再补 2 张」时不能把前面的丢掉。 */
+const MAX_REF = 10;
+let _refFiles = [], _refUrls = [];
+function onRefPick(inp){
+  const add = Array.from(inp.files || []);
+  inp.value = '';                      // 清空以便同一个文件能再次被选中
+  if(!add.length) return;
+  const room = MAX_REF - _refFiles.length;
+  if(room <= 0){ toast('最多 ' + MAX_REF + ' 张参考图', true, 'genMsg'); return; }
+  _refFiles = _refFiles.concat(add.slice(0, room));
+  if(add.length > room){
+    toast('最多 ' + MAX_REF + ' 张，只取了前 ' + room + ' 张', true, 'genMsg');
+  }
+  renderRefs();
+}
+function renderRefs(){
+  _refUrls.forEach(u => URL.revokeObjectURL(u));
+  _refUrls = _refFiles.map(f => URL.createObjectURL(f));
+  $('#refThumbs').innerHTML = _refFiles.map((f, i) =>
+    '<div class="ref-thumb" title="' + esc(f.name) + '">' +
+      '<img src="' + _refUrls[i] + '" alt="">' +
+      '<i onclick="delRef(' + i + ')" title="移除">×</i></div>').join('');
+  $('#refCount').textContent = _refFiles.length
+    ? _refFiles.length + ' / ' + MAX_REF + ' 张' : '未选择（最多 ' + MAX_REF + ' 张）';
+}
+function delRef(i){
+  _refFiles.splice(i, 1);
+  renderRefs();
+}
+function clearRef(){
+  if(!_refFiles.length) return;
+  _refFiles = [];
+  renderRefs();
+  toast('已清空参考图', false, 'genMsg');
+}
+// 「接着这张改」= 切到继续对话。不用把图再传一次 —— 服务端本来就留着上下文，
+// 这正是两种模式的差别：新对话要重新描述，继续对话只说改哪儿就行。
+function useAsRef(){
+  setMode('continue');
+  $('#genPrompt').value = '';
+  $('#genPrompt').focus();
+  toast('已切到「继续对话」，直接描述要改的地方即可', false, 'genMsg');
+}
+async function doGenerate(){
+  const prompt = ($('#genPrompt').value || '').trim();
+  if(!prompt){ toast('请输入提示词', true, 'genMsg'); return; }
+  const body = {prompt, mode: _genMode};
+  if(_genMode === 'continue'){
+    const cid = pickedCid();
+    if(cid) body.conversation_id = cid;
+  }
+  if(_refFiles.length){
+    const readOne = f => new Promise((res, rej) => {
+      const rd = new FileReader();
+      rd.onload = () => res(rd.result);
+      rd.onerror = () => rej(new Error('读取参考图失败：' + f.name));
+      rd.readAsDataURL(f);
+    });
+    // images 是数组：服务端收 image 或 images，多张只能走数组形式
+    body.images = await Promise.all(_refFiles.map(readOne));
+  }
+  const btn = $('#genBtn');
+  btn.disabled = true; btn.textContent = '生成中…';
+  toast('正在生成，通常 20~60 秒…', false, 'genMsg');
+  try{
+    const j = await api('/v1/images/generations', body);
+    const d = (j.data || [])[0];
+    if(!d) throw new Error('没有返回图片');
+    const name = (d.url || '').split('/').pop();
+    currentArt = name;
+    _curConv = j.conversation_id || '';
+    $('#genImg').src = d.url;
+    const modeTxt = j.mode === 'continue' ? '继续对话' : '新对话';
+    const badge = j.fell_back
+      ? '<span class="tag err">续接失败，已按新对话出图</span>' : '';
+    const refTxt = j.references ? ' · 参考图 ' + j.references + ' 张' : '';
+    $('#genMeta').innerHTML =
+      '账号 ' + esc(d.account || '') + ' · 耗时 ' + d.elapsed + 's · ' +
+      (d.size ? Math.round(d.size / 1024) + ' KB · ' : '') +
+      '模式 <b>' + modeTxt + '</b>' + badge + refTxt + '<br>' +
+      '会话 ' + esc(_curConv || '（无）') + ' · 第 ' + (j.turn || 0) + ' 轮' +
+      (j.refs_dropped ? '<br><span class="err">参考图超出上限，已丢弃 ' +
+        j.refs_dropped + ' 张</span>' : '');
+    $('#genOutCard').style.display = '';
+    toast('完成', false, 'genMsg');
+    loadConvs();
+  }catch(e){
+    toast(e.message || '生成失败', true, 'genMsg');
+  }finally{
+    btn.disabled = false; btn.textContent = '生成';
+  }
+}
+
+/* ==================== Gemini 工作台（内嵌网页） ====================
+   网页视图由桌面客户端用一块 WebContentsView 叠在 #studioStage 上面，
+   页面本身只负责：选账号、发指令、把 stage 的位置告诉客户端、渲染状态。
+   客户端没接管时（普通浏览器打开本页）自动降级，EB() 返回 null。        */
+function EB(){
+  return (window.gpool && window.gpool.available && window.gpool.browser) ? window.gpool.browser : null;
+}
+let _studioSnap = { tabs: [], activeAccountId: null };
+let _studioBound = false;
+let _stageRaf = 0;
+let _lastStage = '';
+let _studioAccs = [];
+
+function studioInit(){
+  if(!EB()){
+    $('#studioFallback').classList.remove('hidden');
+    return;
+  }
+  window.gpool.onBrowserEvent(s => {
+    _studioSnap = s;
+    studioRenderAccounts();
+    studioRender();
+  });
+  $('#studioAccounts').addEventListener('click', async e => {
+    const it = e.target.closest('.studio-acc');
+    if(it) await studioOpen(it.dataset.id, {});
+  });
+  $('#studioBack').onclick   = () => EB() && EB().navigate('back');
+  $('#studioFwd').onclick    = () => EB() && EB().navigate('forward');
+  $('#studioReload').onclick = () => EB() && EB().reload(_studioSnap.activeAccountId);
+  $('#studioGo').onclick     = () => EB() && EB().navigateTo($('#studioUrl').value);
+  $('#studioUrl').onkeydown  = e => { if(e.key === 'Enter') $('#studioGo').click(); };
+  $('#studioClose').onclick  = async () => {
+    if(_studioSnap.activeAccountId) await EB().close(_studioSnap.activeAccountId);
+    await studioRefresh();
+  };
+  $('#studioNew').onclick = async () => {
+    try{
+      // 占位账号：没有 Cookie 也能建，工作台里登录成功后靠「同步登录态」转正
+      const r = await api('/v1/accounts/add', { placeholder: true });
+      toast('已新建会话：在右侧登录 Google，成功会自动写回账号池', false, 'studioMsg');
+      await studioOpen(r.id, {});
+    }catch(e){ toast('创建失败：' + e.message, true, 'studioMsg'); }
+  };
+  $('#studioSync').onclick = async () => {
+    const id = _studioSnap.activeAccountId;
+    if(!id){ toast('先打开一个账号', true, 'studioMsg'); return; }
+    toast('正在回写…', false, 'studioMsg');
+    try{
+      const r = await EB().syncCookies(id);
+      if(r.ok){ toast('已写回账号池，后台出图即时生效', false, 'studioMsg'); refresh(); }
+      else toast('同步失败：' + (r.error || '未知原因'), true, 'studioMsg');
+    }catch(e){ toast(e.message, true, 'studioMsg'); }
+  };
+  // 网页被踢回登录页时用账号池里的 Cookie 重灌一次，比在外面开窗口登录快
+  $('#studioReinject').onclick = async () => {
+    const id = _studioSnap.activeAccountId;
+    if(!id){ toast('先打开一个账号', true, 'studioMsg'); return; }
+    await EB().close(id);
+    await studioOpen(id, {});
+  };
+}
+
+function gotoPage(p){
+  const btn = document.querySelector('.nav-item[data-page="' + p + '"]');
+  if(btn) btn.click();
+}
+
+async function studioOpen(id, opts){
+  if(!EB()){ toast('内嵌工作台仅在桌面客户端里可用', true, 'loginmsg'); return; }
+  const go = !(opts && opts.goto === false);
+  try{
+    const a = await api('/v1/accounts/secret?id=' + encodeURIComponent(id));
+    // auth 摘要要一起传：凭据被判不可用时，客户端先把分区里的旧 Cookie 清掉，
+    // 否则网页会一直卡在一个「已登录但会话无效」的状态里，怎么刷新都登不上。
+    await EB().open({ id: a.id, email: a.email, psid: a.psid,
+                      psidts: a.psidts, proxy: a.proxy, auth: a.auth });
+    await studioRefresh();
+    if(go){ gotoPage('studio'); }
+    else { enterStudio(); }
+  }catch(e){
+    toast('打开失败：' + e.message, true, go ? 'loginmsg' : 'studioMsg');
+  }
+}
+
+async function studioRefresh(){
+  if(!EB()) return;
+  _studioSnap = await EB().snapshot();
+  try{ _studioAccs = (await (await fetch('/health')).json()).accounts || []; }
+  catch(e){ _studioAccs = []; }
+  studioRenderAccounts();
+  studioRender();
+}
+
+function studioRenderAccounts(){
+  const el = $('#studioAccounts');
+  if(!el) return;
+  const opened = new Set((_studioSnap.tabs || []).map(t => t.accountId));
+  el.innerHTML = _studioAccs.length ? _studioAccs.map(a => {
+    // 圆点优先反映登录态：凭据坏了，网页里同样登不上，比健康度更值得先看
+    const d = authOf(a);
+    const cls = !authUsable(a) ? 'err'
+      : (a.status === 'active'
+         ? (a.health >= 0.8 ? 'ok' : a.health >= 0.4 ? 'warn' : 'err') : 'err');
+    const tip = (d.message || '') + (d.detail ? '\n' + d.detail : '');
+    return '<div class="studio-acc' + (_studioSnap.activeAccountId === a.id ? ' active' : '') +
+      '" data-id="' + a.id + '" title="' + esc(tip) + '"><span class="dot ' + cls + '"></span>' +
+      '<span class="nm">' + esc(a.email || '(未命名)') + '</span>' +
+      (opened.has(a.id) ? '<span class="op">●</span>' : '') + '</div>';
+  }).join('') : '<div class="cap">暂无账号，先去账号池添加</div>';
+}
+
+function studioRender(){
+  const t = (_studioSnap.tabs || []).find(x => x.accountId === _studioSnap.activeAccountId);
+  $('#studioPh').style.display = t ? 'none' : 'flex';
+  $('#studioUrl').value = t ? (t.url || '') : 'about:blank';
+  $('#studioBack').disabled = !(t && t.canGoBack);
+  $('#studioFwd').disabled = !(t && t.canGoForward);
+  const st = $('#studioState');
+  if(!t){ st.textContent = '未打开'; st.className = ''; return; }
+  if(t.error){ st.textContent = t.error; st.className = 'err'; return; }
+  if(t.loading){ st.textContent = '加载中…'; st.className = ''; return; }
+  st.textContent = t.injected ? (t.title || t.accountName)
+                              : (t.title || t.accountName) + ' · 未注入 Cookie，如未登录请「重开会话」';
+  st.className = '';
+  // 登录态提示放在状态栏右侧：网页里看不出来「库里这份凭据是不是坏的」，
+  // 而它决定了后台出图能不能用，必须在这里说清楚。
+  const a = (_studioAccs || []).find(x => x.id === t.accountId);
+  const m = $('#studioMsg');
+  if(a && !authUsable(a)){
+    m.textContent = '登录态：' + (authOf(a).message || '不可用')
+      + '（在右侧登录或点「同步登录态」写回）';
+    m.className = 'err';
+  }else{
+    m.textContent = '';
+    m.className = '';
+  }
+}
+
+// stage 的位置每当布局变化就要告诉客户端，否则网页视图会停在旧的位置上
+function stageTick(){
+  const el = $('#studioStage');
+  if(!el || currentPage !== 'studio' || !EB()){ _stageRaf = 0; return; }
+  const r = el.getBoundingClientRect();
+  const key = [Math.round(r.left), Math.round(r.top),
+               Math.round(r.width), Math.round(r.height)].join(',');
+  if(key !== _lastStage){
+    _lastStage = key;
+    EB().setLayout({ visible: true,
+                     bounds: { x: r.left, y: r.top, width: r.width, height: r.height } });
+  }
+  _stageRaf = requestAnimationFrame(stageTick);
+}
+
+function enterStudio(){
+  if(!EB()) return;
+  _lastStage = '';
+  studioRefresh();
+  if(!_stageRaf) _stageRaf = requestAnimationFrame(stageTick);
+}
+
+function leaveStudio(){
+  if(_stageRaf){ cancelAnimationFrame(_stageRaf); _stageRaf = 0; }
+  if(EB()) EB().setLayout({ visible: false });
+}
+
+// 托盘只剩「显示主窗口 / 退出」，重启网关改从这里触发。
+// 普通浏览器里打开时 window.gpool 不存在，按钮直接隐藏（那种情况下也没有外壳可重启）。
+(function setupGatewayControls(){
+  const b = document.getElementById('btnRestartGw');
+  if(!b) return;
+  const can = window.gpool && typeof window.gpool.restartGateway === 'function';
+  if(!can){ b.style.display = 'none'; return; }
+  b.onclick = async () => {
+    b.disabled = true;
+    b.textContent = '重启中…';
+    try{ await window.gpool.restartGateway(); }
+    catch(e){ toast('重启失败：' + ((e && e.message) || e), true, 'cfgmsg'); }
+    finally{ b.disabled = false; b.textContent = '重启网关'; }
+  };
+})();
+
+studioInit();
+refresh();
+setMode('new');
+</script>
+</body>
+</html>

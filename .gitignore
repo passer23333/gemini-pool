@@ -1,0 +1,43 @@
+# ============================================================
+#  隐私红线：以下内容包含登录凭据 / 账号数据 / 私人生成物，
+#  绝不能进入仓库。改动忽略规则前请三思。
+# ============================================================
+
+# ---- 账号凭据与浏览器登录态 ----
+v3/profiles/
+poc/flow/flow_profile/
+
+# ---- 账号数据库与会话数据 ----
+v3/pool.db
+v3/pool.db-journal
+v3/conversations.json
+
+# ---- 运行时产物（日志含本机路径，artifacts 为私人生成图）----
+v3/logs/
+v3/artifacts/
+v3/gateway.json
+v3/errorlevel
+__pycache__/
+*.pyc
+
+# ---- 本地配置：含 api_key 与代理地址，仓库只提供 example ----
+v3/config.json
+
+# ---- 界面截图：含真实账号标识 ----
+v3/ui_*.png
+
+# ---- 大体积第三方运行时（Electron 外壳 / Camoufox），见 README 说明 ----
+v3/runtime/
+
+# ---- 开发期 PoC（含抓包 Cookie、请求日志、第三方源码副本）----
+poc/
+
+# ---- 旧版归档（db.json 含历史凭据与本机路径）----
+_v2_archive/
+
+# ---- 本地工作笔记 ----
+.workbuddy/
+
+# ---- 系统杂物 ----
+Thumbs.db
+.DS_Store
